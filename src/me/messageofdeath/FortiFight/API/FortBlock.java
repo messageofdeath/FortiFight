@@ -5,6 +5,7 @@ public class FortBlock {
 	private String world;
 	private int prevID, prevData, x, y, z;
 	public FortBlock(String world, int prevID, int prevData, int x, int y, int z) {
+		this.world = world;
 		this.prevID = prevID;
 		this.prevData = prevData;
 		this.x = x;

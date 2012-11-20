@@ -5,6 +5,7 @@ import me.messageofdeath.FortiFight.API.Player;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.GameMode;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -16,10 +17,16 @@ public class playerListener implements Listener {
 	
 	@EventHandler
 	public void onJoin(PlayerJoinEvent event) {
-		if(!Engine.isGameInSession()) {
-			if((Bukkit.getOnlinePlayers().length - 1) == 2) {
+		if(Engine.isInPreLobby()) {
+			if(Bukkit.getOnlinePlayers().length == 2) {
 				Engine.startGame();
 			}
+		}else{
+			event.getPlayer().sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "Go build your fort! You have a limited amount of time!");
+			event.getPlayer().setGameMode(GameMode.CREATIVE);
+		}
+		if(!Engine.players.contains(event.getPlayer().getName())) {
+			Engine.players.add(event.getPlayer().getName());
 		}
 	}
 	
@@ -34,5 +41,23 @@ public class playerListener implements Listener {
 	public void onDeath(PlayerDeathEvent event) {
 		Player player = Engine.getPlayer(event.getEntity().getName());
 		player.kickPlayer();
+		Engine.setAmountOfPlayers(Engine.getAmountOfPlayers() - 1);
+		event.setDeathMessage(ChatColor.GOLD + "[Chessium] " +  ChatColor.AQUA + player.getName() + ChatColor.DARK_RED + " was killed by " + event.getEntity().getKiller().getName());
+		if(Engine.getAmountOfPlayers() == 1) {
+			Engine.endGame();
+		}
+		if(Engine.getAmountOfPlayers() == 2) {
+			for(org.bukkit.entity.Player players : Bukkit.getOnlinePlayers()) {
+				players.sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "Sudden Death! You have 5 minutes to kill the other player!");
+			}
+			Bukkit.getScheduler().scheduleSyncDelayedTask(Engine.plugin, new Runnable() {
+				@Override
+				public void run() {
+					if(Engine.isGameInSession()) {
+						Engine.endGame();
+					}
+				}
+			}, 6000);
+		}
 	}
 }

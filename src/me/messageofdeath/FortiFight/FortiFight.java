@@ -3,7 +3,6 @@ package me.messageofdeath.FortiFight;
 import java.util.logging.Level;
 
 import me.messageofdeath.FortiFight.API.Engine;
-import me.messageofdeath.FortiFight.Listeners.blockListener;
 import me.messageofdeath.FortiFight.Listeners.playerListener;
 
 import org.bukkit.Bukkit;
@@ -22,9 +21,7 @@ public class FortiFight extends JavaPlugin {
 		file = getDescription();
 		prefix = "[" + file.getName() + "] " +  file.getVersion() + ": ";
 		Engine.onStartUp();
-		Engine.rollBackWorld();
 		getServer().getPluginManager().registerEvents(new playerListener(), this);
-		getServer().getPluginManager().registerEvents(new blockListener(), this);
 		log(Level.INFO, "is now enabled!");
 	}
 	

@@ -4,35 +4,52 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
+
+import net.coreprotect.CoreProtect;
+import net.coreprotect.CoreProtectAPI;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.Plugin;
 
-import lib.PatPeter.SQLibrary.MySQL;
 import me.messageofdeath.FortiFight.FortiFight;
 
 public class Engine {
 	
 	public static boolean canJoin = true;
+	public static boolean isInPreLobby = true;
 	public static FortiFight plugin = FortiFight.plugin;
 	private static File file;
-	private static MySQL mysql;
 	private static FileConfiguration config;
+	private static int amountOfPlayers;
+	private static CoreProtectAPI api;
+	public static ArrayList<String> players = new ArrayList<String>();
 	
 	public static void log(Level level, String log) {
 		FortiFight.log(level, log);
 	}
 	
+	public static int getAmountOfPlayers() {
+		return amountOfPlayers;
+	}
+	
+	public static void setAmountOfPlayers(int i) {
+		amountOfPlayers = i;
+	}
+	
 	public static Player getPlayer(String name) {
 		return new Player(name);
+	}
+	
+	public static boolean isInPreLobby() {
+		return isInPreLobby;
 	}
 	
 	public static boolean isGameInSession() {
@@ -52,17 +69,11 @@ public class Engine {
 			}
 			config = new YamlConfiguration();
 			config.load(file);
-			// *** MySQL ***
-			mysql = new MySQL(Bukkit.getLogger(), "[FortiFight]", config.getString("MySQL.Host"), config.getString("MySQL.Port"), config.getString("MySQL.Database"), config.getString("MySQL.Username"), config.getString("MySQL.Password"));
-			mysql.open();
-			if(!mysql.checkTable("FortiFight")) {
-				mysql.createTable("CREATE TABLE FortiFight (World VARCHAR(255), Id INT, IdData INT, X INT, Y INT, Z INT)");
-			}
+			api = getCoreProtect();
 		}catch(Exception e) {}
 	}
 	
 	public static void onShutDown() {
-		mysql.close();
 	}
 	
 	private static void copy(InputStream in, File file) {
@@ -80,48 +91,79 @@ public class Engine {
 		}
 	}
 	
+	private static CoreProtectAPI getCoreProtect() {
+		Plugin plugin = Engine.plugin.getServer().getPluginManager().getPlugin("CoreProtect");
+		     
+		// Check that CoreProtect is loaded
+		if (plugin == null || !(plugin instanceof CoreProtect)) {
+		  return null;
+		}
+		        
+		// Check that a compatible version of CoreProtect is loaded
+		if (Double.parseDouble(plugin.getDescription().getVersion()) < 1.6){
+		  return null;
+		}
+		        
+		// Check that the API is enabled
+		CoreProtectAPI CoreProtect = ((CoreProtect)plugin).getAPI();
+		if (CoreProtect.isEnabled()==false){
+		  return null;
+		}
+		         
+		return CoreProtect;
+	}
+	
 	public static void startGame() {
+		isInPreLobby = false;
 		for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
 			player.setGameMode(GameMode.CREATIVE);
-			player.sendMessage(ChatColor.GOLD + "Go build your forts! YOU HAVE 10 MINUTES!");
+			player.teleport(new Location(Bukkit.getWorld("world"), 86, 67, 253));
+			player.sendMessage(ChatColor.GOLD + "[Chessium] " +  ChatColor.DARK_RED + "Go build your forts you have 10 minutes!");
 		}
 		Bukkit.getScheduler().scheduleAsyncDelayedTask(plugin, new Runnable() {
 			@Override
 			public void run() {
 				for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
-					player.setGameMode(GameMode.SURVIVAL);
+					player.sendMessage(ChatColor.GOLD + "[Chessium] " +  ChatColor.DARK_RED + "You have 5 minutes!");
 				}
-				canJoin = false;
+				Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
+					@Override
+					public void run() {
+						for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
+							player.sendMessage(ChatColor.GOLD + "[Chessium] " +  ChatColor.DARK_RED + "You have 1 minute!");
+						}
+						Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
+							@Override
+							public void run() {
+								for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
+									player.setGameMode(GameMode.SURVIVAL);
+									player.sendMessage(ChatColor.GOLD + "[Chessium] " + ChatColor.DARK_RED + "The game has started!");
+								}
+								Engine.setAmountOfPlayers(Bukkit.getOnlinePlayers().length);
+								canJoin = false;
+							}
+						}, 5);//1200
+					}
+				}, 5);//4800
 			}
-		}, 12000);
+		}, 5);//6000
 	}
 	
 	public static void endGame() {
+		for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+			player.kickPlayer(ChatColor.RED + "Map Resetting. You will be able to join in a second.");
+		}
 		Engine.rollBackWorld();
 		canJoin = true;
 	}
 	
-	public static void registerBlockChange(FortBlock block) {
-		try {
-			mysql.query("INSERT INTO FortiFight (World, Id, IdData, X, Y, Z) VALUES ("+block.getWorld()+","+block.getId()+","+block.getIdData()+","+block.getX()+","+block.getY()+","+block.getZ()+")");
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
-	}
-	
 	public static void rollBackWorld() {
-		try {
-			ResultSet rs = mysql.query("SELECT * FROM FortiFight");
-			while(rs.next()) {
-				World world = Bukkit.getWorld(rs.getString("World"));
-				int id = rs.getInt("Id");
-				byte idData =  rs.getByte("IdData");
-				int x = rs.getInt("X"), y = rs.getInt("Y"), z = rs.getInt("Z");
-				Location loc = new Location(world, x, y, z);
-				loc.getBlock().setTypeId(id);
-				loc.getBlock().setData(idData);
-			}
-			mysql.query("DELETE * FROM FortiFight");
-		} catch (SQLException e) {e.printStackTrace();}
+		ArrayList<Integer> n = new ArrayList<Integer>();
+		int i = players.size() - 1;
+		while(i > -1) {
+			api.performRollback(players.get(i), 7200, 0, new Location(Bukkit.getWorld("world"), 0,0,0), n, n);
+			players.remove(i);
+			i--;
+		}
 	}
 }
