@@ -8,6 +8,8 @@ import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
@@ -27,6 +29,22 @@ public class playerListener implements Listener {
 		}
 		if(!Engine.players.contains(event.getPlayer().getName())) {
 			Engine.players.add(event.getPlayer().getName());
+		}
+	}
+	
+	@EventHandler
+	public void onPlace(BlockPlaceEvent event) {
+		if(!Engine.isInPreLobby()) {
+			Engine.addToBlocks(event.getBlock());
+		}else{
+			event.setCancelled(true);
+		}
+	}
+	
+	@EventHandler
+	public void onBreak(BlockBreakEvent event) {
+		if(Engine.isInPreLobby()) {
+			event.setCancelled(true);
 		}
 	}
 	

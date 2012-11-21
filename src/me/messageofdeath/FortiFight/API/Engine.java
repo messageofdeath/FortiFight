@@ -5,7 +5,6 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Level;
 
 import net.coreprotect.CoreProtect;
@@ -15,6 +14,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.block.Block;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
@@ -31,9 +31,14 @@ public class Engine {
 	private static int amountOfPlayers;
 	private static CoreProtectAPI api;
 	public static ArrayList<String> players = new ArrayList<String>();
+	public static ArrayList<Block> blocks =  new ArrayList<Block>();
 	
 	public static void log(Level level, String log) {
 		FortiFight.log(level, log);
+	}
+	
+	public static void addToBlocks(Block block) {
+		blocks.add(block);
 	}
 	
 	public static int getAmountOfPlayers() {
@@ -153,8 +158,13 @@ public class Engine {
 		for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
 			player.kickPlayer(ChatColor.RED + "Map Resetting. You will be able to join in a second.");
 		}
+		Engine.erasePlayerData();
 		Engine.rollBackWorld();
 		canJoin = true;
+	}
+	
+	public static void erasePlayerData() {
+		
 	}
 	
 	public static void rollBackWorld() {
