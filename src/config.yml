@@ -1,6 +1,22 @@
-MySQL:
-  Host: localhost
-  Port: 3306
-  Database: minecraft
-  Username: root
-  Password: ''
+Game:
+  #This is where they will be teleported when the game starts
+  #Like when they go into creative for 10 minutes
+  creativeSpawn:
+    World:
+    X:
+    Y:
+    Z:
+    Yaw:
+    Pitch:
+  #This is for pre game
+  #When they join when its in pre game
+  preGameSpawn:
+    World:
+    X:
+    Y:
+    Z:
+    Yaw:
+    Pitch:
+  minPlayersToStart: 2
+  maxPlayers: 40
+  World: 'world'

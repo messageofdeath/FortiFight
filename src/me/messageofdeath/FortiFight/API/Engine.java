@@ -5,19 +5,24 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 
-import net.coreprotect.CoreProtect;
-import net.coreprotect.CoreProtectAPI;
+import net.milkycraft.Scheduler.PlayerTimer;
+import net.milkycraft.Scheduler.Schedule;
+import net.milkycraft.Scheduler.Scheduler;
+import net.milkycraft.Scheduler.Time;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
-import org.bukkit.block.Block;
+import org.bukkit.World;
+
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.Plugin;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Item;
 
 import me.messageofdeath.FortiFight.FortiFight;
 
@@ -27,18 +32,12 @@ public class Engine {
 	public static boolean isInPreLobby = true;
 	public static FortiFight plugin = FortiFight.plugin;
 	private static File file;
-	private static FileConfiguration config;
+	public static FileConfiguration config;
 	private static int amountOfPlayers;
-	private static CoreProtectAPI api;
 	public static ArrayList<String> players = new ArrayList<String>();
-	public static ArrayList<Block> blocks =  new ArrayList<Block>();
 	
 	public static void log(Level level, String log) {
 		FortiFight.log(level, log);
-	}
-	
-	public static void addToBlocks(Block block) {
-		blocks.add(block);
 	}
 	
 	public static int getAmountOfPlayers() {
@@ -74,11 +73,46 @@ public class Engine {
 			}
 			config = new YamlConfiguration();
 			config.load(file);
-			api = getCoreProtect();
 		}catch(Exception e) {}
 	}
 	
+	public static Location getLocation(int i) {
+		if(i == 1) {
+			return new Location(Bukkit.getWorld(config.getString("Game.preGameSpawn.World")), config.getDouble("Game.preGameSpawn.X")
+					, config.getDouble("Game.preGameSpawn.Y"), config.getDouble("Game.preGameSpawn.Z")
+					, Float.parseFloat(String.valueOf(config.getDouble("Game.preGameSpawn.Yaw")))
+					, Float.parseFloat(String.valueOf(config.getDouble("Game.preGameSpawn.Pitch"))));
+		}
+		if(i == 2) {
+			return new Location(Bukkit.getWorld(config.getString("Game.creativeSpawn.World")), config.getDouble("Game.creativeSpawn.X")
+					, config.getDouble("Game.creativeSpawn.Y"), config.getDouble("Game.creativeSpawn.Z")
+					, Float.parseFloat(String.valueOf(config.getDouble("Game.creativeSpawn.Yaw")))
+					, Float.parseFloat(String.valueOf(config.getDouble("Game.creativeSpawn.Pitch"))));
+		}
+		return null;
+	}
+	
+	public static String getMOTD() {
+		if(Engine.isInPreLobby()) {
+			return ChatColor.DARK_RED + "The game is the in lobby.";
+		}else if(Engine.isGameInSession()) {
+			return ChatColor.DARK_RED + "The game is in session.                           Time Left: " + Engine.getTimeLeft("gameTimer", Time.gameTime);
+		}else if(!Engine.isInPreLobby()) {
+			return ChatColor.DARK_RED + "You can still join! Create your fort!            Time Left: " + Engine.getTimeLeft("preGameTimer", Time.preGameTime);
+		}
+		return ChatColor.DARK_RED + "There is an error, inform an admin.";
+	}
+	
+	public static String getTimeLeft(String name, Time time) {
+		int i = PlayerTimer.getRemainingTime(name, time);
+		int remainder = i % 3600, minutes = remainder / 60, seconds = remainder % 60; 
+		return ChatColor.GOLD + String.valueOf(minutes) + " minutes and " + seconds + " seconds";
+	}
+	
 	public static void onShutDown() {
+		for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+			player.kickPlayer(ChatColor.DARK_RED + "You have been kicked due to a reload/shutdown");
+		}
 	}
 	
 	private static void copy(InputStream in, File file) {
@@ -96,33 +130,15 @@ public class Engine {
 		}
 	}
 	
-	private static CoreProtectAPI getCoreProtect() {
-		Plugin plugin = Engine.plugin.getServer().getPluginManager().getPlugin("CoreProtect");
-		     
-		// Check that CoreProtect is loaded
-		if (plugin == null || !(plugin instanceof CoreProtect)) {
-		  return null;
-		}
-		        
-		// Check that a compatible version of CoreProtect is loaded
-		if (Double.parseDouble(plugin.getDescription().getVersion()) < 1.6){
-		  return null;
-		}
-		        
-		// Check that the API is enabled
-		CoreProtectAPI CoreProtect = ((CoreProtect)plugin).getAPI();
-		if (CoreProtect.isEnabled()==false){
-		  return null;
-		}
-		         
-		return CoreProtect;
-	}
-	
 	public static void startGame() {
 		isInPreLobby = false;
+		Schedule s = Scheduler.schedule(plugin, "preGameTimer", Time.preGameTime);
+		Scheduler.schedulePlayerCooldown(s);
 		for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
 			player.setGameMode(GameMode.CREATIVE);
-			player.teleport(new Location(Bukkit.getWorld("world"), 86, 67, 253));
+			player.teleport(getLocation(2));
+			player.setHealth(20);
+			player.setFoodLevel(20);
 			player.sendMessage(ChatColor.GOLD + "[Chessium] " +  ChatColor.DARK_RED + "Go build your forts you have 10 minutes!");
 		}
 		Bukkit.getScheduler().scheduleAsyncDelayedTask(plugin, new Runnable() {
@@ -142,38 +158,83 @@ public class Engine {
 							public void run() {
 								for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
 									player.setGameMode(GameMode.SURVIVAL);
-									player.sendMessage(ChatColor.GOLD + "[Chessium] " + ChatColor.DARK_RED + "The game has started!");
+									player.sendMessage(ChatColor.GOLD + "[Chessium] " + ChatColor.DARK_RED + "The game has started! You have 20 minutes!");
 								}
+								Schedule s = Scheduler.schedule(plugin, "gameTimer", Time.gameTime);
+								Scheduler.schedulePlayerCooldown(s);
 								Engine.setAmountOfPlayers(Bukkit.getOnlinePlayers().length);
 								canJoin = false;
+								Engine.startTimer();
 							}
-						}, 5);//1200
+						}, 1200);//1200
 					}
-				}, 5);//4800
+				}, 4800);//4800
 			}
-		}, 5);//6000
+		}, 6000);//6000
+	}
+	
+	public static void startTimer() {
+		Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
+			@Override
+			public void run() {
+				if(Engine.isGameInSession()) {
+					for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
+						player.sendMessage(ChatColor.GOLD + "[Chessium] " + ChatColor.DARK_RED + "You have 10 minutes left!");
+					}
+					Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
+						@Override
+						public void run() {
+							if(Engine.isGameInSession()) {
+								for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
+									player.sendMessage(ChatColor.GOLD + "[Chessium] " + ChatColor.DARK_RED + "You have 5 minutes left!");
+								}
+								Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
+									@Override
+									public void run() {
+										if(Engine.isGameInSession()) {
+											Engine.endGame();
+										}
+									}
+								}, 6000);
+							}
+						}
+					}, 6000);
+				}
+			}
+		}, 12000);
 	}
 	
 	public static void endGame() {
 		for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
 			player.kickPlayer(ChatColor.RED + "Map Resetting. You will be able to join in a second.");
 		}
-		Engine.erasePlayerData();
+		Engine.removeItemsFromWorld();
 		Engine.rollBackWorld();
+		Blocks.clear();
 		canJoin = true;
+		isInPreLobby = true;
 	}
 	
-	public static void erasePlayerData() {
-		
+	public static void erasePlayerData(org.bukkit.entity.Player player) {
+		player.getInventory().clear();
+	}
+	
+	public static void removeItemsFromWorld() {
+		World world = Bukkit.getWorld(config.getString("Game.creativeSpawn.World"));
+		final List<Entity> entities = world.getEntities();
+		for(Entity entity : entities) {
+			if(entity instanceof Item) {
+				entity.remove();
+			}
+		}
 	}
 	
 	public static void rollBackWorld() {
-		ArrayList<Integer> n = new ArrayList<Integer>();
-		int i = players.size() - 1;
-		while(i > -1) {
-			api.performRollback(players.get(i), 7200, 0, new Location(Bukkit.getWorld("world"), 0,0,0), n, n);
-			players.remove(i);
-			i--;
+		for(String name : players) {
+			Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "co rollback u:" + name + " t:24h");
 		}
+		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "co rollback u:creeper t:24h");
+		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "co rollback u:explosion t:24");
+		players.clear();
 	}
 }
