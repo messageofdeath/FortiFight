@@ -34,7 +34,7 @@ public class Engine {
 	private static File file;
 	public static FileConfiguration config;
 	private static int amountOfPlayers;
-	public static ArrayList<String> players = new ArrayList<String>();
+	public static ArrayList<String> players = new ArrayList<String>(), allowed = new ArrayList<String>(), adminallowed = new ArrayList<String>();
 	
 	public static void log(Level level, String log) {
 		FortiFight.log(level, log);
@@ -74,6 +74,46 @@ public class Engine {
 			config = new YamlConfiguration();
 			config.load(file);
 		}catch(Exception e) {}
+	}
+	
+	public static boolean isAllowedToJoin(int id, String name) {
+		if(id == 0) {
+			int i = allowed.size() - 1;
+			while(i > -1) {
+				if(allowed.get(i).equalsIgnoreCase(name)) {
+					return true;
+				}
+				i--;
+			}	
+		}
+		if(id == 1) {
+			int i = adminallowed.size() - 1;
+			while(i > -1) {
+				if(adminallowed.get(i).equalsIgnoreCase(name)) {
+					return true;
+				}
+				i--;
+			}
+		}
+		return false;
+	}
+	
+	public static void addToAllowed(int i, String name) {
+		if(i == 0) {
+			allowed.add(name);
+		}
+		if(i == 1) {
+			adminallowed.add(name);
+		}
+	}
+	
+	public static void removeFromAllowed(int i, String name) {
+		if(i == 0) {
+			allowed.remove(name);
+		}
+		if(i == 1) {
+			adminallowed.remove(name);
+		}
 	}
 	
 	public static Location getLocation(int i) {
@@ -130,13 +170,20 @@ public class Engine {
 		}
 	}
 	
+	@SuppressWarnings("unchecked")
 	public static void startGame() {
 		isInPreLobby = false;
+		adminallowed = (ArrayList<String>)config.getList("Game.canJoinWhenGameIsInSession");
 		Schedule s = Scheduler.schedule(plugin, "preGameTimer", Time.preGameTime);
 		Scheduler.schedulePlayerCooldown(s);
 		for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
 			player.setGameMode(GameMode.CREATIVE);
-			player.teleport(getLocation(2));
+			try {
+				player.teleport(getLocation(2));
+			}catch(NullPointerException e) {
+				log(Level.SEVERE, "The spawn for the game is unknown");
+				player.sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "There was an error, please inform your admin that they did not set up the config correctly.");
+			}
 			player.setHealth(20);
 			player.setFoodLevel(20);
 			player.sendMessage(ChatColor.GOLD + "[Chessium] " +  ChatColor.DARK_RED + "Go build your forts you have 10 minutes!");
@@ -160,8 +207,6 @@ public class Engine {
 									player.setGameMode(GameMode.SURVIVAL);
 									player.sendMessage(ChatColor.GOLD + "[Chessium] " + ChatColor.DARK_RED + "The game has started! You have 20 minutes!");
 								}
-								Schedule s = Scheduler.schedule(plugin, "gameTimer", Time.gameTime);
-								Scheduler.schedulePlayerCooldown(s);
 								Engine.setAmountOfPlayers(Bukkit.getOnlinePlayers().length);
 								canJoin = false;
 								Engine.startTimer();
@@ -174,6 +219,9 @@ public class Engine {
 	}
 	
 	public static void startTimer() {
+		Schedule s = Scheduler.schedule(plugin, "gameTimer", Time.gameTime);
+		Scheduler.schedulePlayerCooldown(s);
+		
 		Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
 			@Override
 			public void run() {
@@ -211,6 +259,7 @@ public class Engine {
 		Engine.removeItemsFromWorld();
 		Engine.rollBackWorld();
 		Blocks.clear();
+		allowed.clear();
 		canJoin = true;
 		isInPreLobby = true;
 	}

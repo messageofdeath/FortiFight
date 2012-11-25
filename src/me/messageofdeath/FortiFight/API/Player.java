@@ -29,6 +29,6 @@ public class Player {
 	}
 	
 	public void kickPlayer() {
-		player.kickPlayer(ChatColor.RED + "You died!");
+		player.kickPlayer(ChatColor.DARK_RED + Engine.config.getString("Game.kickplayerDeathMessage"));
 	}
 }

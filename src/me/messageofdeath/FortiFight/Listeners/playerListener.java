@@ -19,6 +19,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerLoginEvent.Result;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.ServerListPingEvent;
 
 public class playerListener implements Listener {
@@ -30,6 +31,7 @@ public class playerListener implements Listener {
 				event.getPlayer().teleport(Engine.getLocation(1));
 			}catch(NullPointerException e) {
 				Engine.log(Level.SEVERE, "The spawn for the lobby does not exist!");
+				event.getPlayer().sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "There was an error, please inform your admin that they did not set up the config correctly.");
 			}
 			if(Bukkit.getOnlinePlayers().length == Engine.config.getInt("Game.minPlayersToStart")) {
 				Engine.startGame();
@@ -46,6 +48,11 @@ public class playerListener implements Listener {
 		if(!Engine.players.contains(event.getPlayer().getName())) {
 			Engine.players.add(event.getPlayer().getName());
 		}
+		if(Engine.isGameInSession()) {
+			event.setJoinMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " isn't mad any more lol...");
+		}else{
+			event.setJoinMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " joined the server.");
+		}
 		event.getPlayer().setHealth(20);
 		event.getPlayer().setFoodLevel(20);
 		Engine.erasePlayerData(event.getPlayer());
@@ -59,13 +66,18 @@ public class playerListener implements Listener {
 	
 	@EventHandler
 	public void onPlace(BlockPlaceEvent event) {
+		Location loc = event.getBlock().getLocation();
+		String loc2 =  loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ();
 		if(!Engine.isInPreLobby()) {
-			Location loc = event.getBlock().getLocation();
-			String loc2 =  loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ();
-			if(Blocks.checkBlock(loc2)) {
-				event.setCancelled(true);
+			if(!Blocks.isWithinAnotherBlock(event.getPlayer().getName(), loc2)) {
+				if(Blocks.checkBlock(loc2)) {
+					event.setCancelled(true);
+				}else{
+					Blocks.addBlockToPlayer(event.getPlayer().getName(), loc2);
+				}
 			}else{
-				Blocks.addBlockToPlayer(event.getPlayer().getName(), loc2);
+				event.setCancelled(true);
+				event.getPlayer().sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "You cannot build within 5 blocks of another players block!");
 			}
 		}else{
 			event.setCancelled(true);
@@ -91,9 +103,35 @@ public class playerListener implements Listener {
 	}
 	
 	@EventHandler
+	public void onQuit(final PlayerQuitEvent event) {
+		if(Engine.isGameInSession()) {
+			if(Engine.isAllowedToJoin(1, event.getPlayer().getName())) {
+				event.setQuitMessage(ChatColor.GOLD + "[Admin Chessium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " left the server.");
+			}else{
+				event.setQuitMessage(ChatColor.GOLD + "[Chessium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " raged quit.");
+			}
+			if(!Engine.isAllowedToJoin(0, event.getPlayer().getName())) {
+				Engine.addToAllowed(0, event.getPlayer().getName());
+				Bukkit.getScheduler().scheduleSyncDelayedTask(Engine.plugin, new Runnable() {
+					@Override
+					public void run() {
+						Engine.removeFromAllowed(0, event.getPlayer().getName());
+					}
+				}, 1800);
+			}
+		}else{
+			event.setQuitMessage(ChatColor.GOLD + "[Chessium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " left the server.");
+		}
+	}
+	
+	@EventHandler
 	public void onLogin(PlayerLoginEvent event) {
 		if(Engine.isGameInSession()) {
-			event.disallow(Result.KICK_OTHER, ChatColor.RED + "You cannot join when the game is in session!");
+			if(Engine.isAllowedToJoin(0, event.getPlayer().getName()) || Engine.isAllowedToJoin(1, event.getPlayer().getName())) {
+				return;
+			}else{
+				event.disallow(Result.KICK_OTHER, ChatColor.RED + "You cannot join when the game is in session!");
+			}
 		}else{
 			if(Bukkit.getOnlinePlayers().length == Engine.config.getInt("Game.maxPlayers")) {
 				event.disallow(Result.KICK_FULL, ChatColor.DARK_RED + "The server has reached its maximum capacity.");

@@ -1,3 +1,4 @@
+# Note: The spawns can be set in-game by using the command "/fort help", to see how
 Game:
   #This is where they will be teleported when the game starts
   #Like when they go into creative for 10 minutes
@@ -17,6 +18,11 @@ Game:
     Z:
     Yaw:
     Pitch:
+  blockProtectionRadius: 5
   minPlayersToStart: 2
   maxPlayers: 40
-  World: 'world'
+  # Will be in Dark Red.
+  kickplayerDeathMessage: 'You Died!'
+  #This is for admins/moderators that will be on the server
+  canJoinWhenGameIsInSession:
+  - icheesy

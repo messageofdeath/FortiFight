@@ -2,9 +2,6 @@ package me.messageofdeath.FortiFight.API;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.logging.Level;
-
-import org.bukkit.block.Block;
 
 public class Blocks {
 
@@ -49,19 +46,34 @@ public class Blocks {
 	}
 	
 	public static boolean checkIfHeOwnsIt(String name, String block) {
-		Engine.log(Level.SEVERE, "0");
 		if(blocks.containsKey(name)) {
-			Engine.log(Level.SEVERE, "1");
 			ArrayList<String> bloc = blocks.get(name);
 			int i = bloc.size() - 1;
 			while(i > -1) {
-				Engine.log(Level.SEVERE, "Loop:  " + i);
 				if(bloc.get(i).equalsIgnoreCase(block)) {
 					return true;
 				}
 				i--;
 			}
-			Engine.log(Level.SEVERE, "2");
+		}
+		return false;
+	}
+	
+	public static boolean isWithinAnotherBlock(String name, String loc) {
+		int radius = 5;// Engine.config.getInt("Game.blockProtectionRadius")
+		String[] loc22 = loc.split(",");
+		int startX = Integer.parseInt(loc22[0]), startY = Integer.parseInt(loc22[1]), startZ = Integer.parseInt(loc22[2]) ;
+		for (int x = startX - radius; x < startX + radius; x++) {
+			for (int y = startY - radius; y < startY + radius; y++) {
+				for (int z = startZ - radius; z < startZ + radius; z++) {
+					String newLoc = x + "," + y + "," + z;
+					if(Blocks.checkBlock(newLoc)) {
+						if(!Blocks.checkIfHeOwnsIt(name, newLoc)) {
+							return true;
+						}
+					}
+				}
+			}
 		}
 		return false;
 	}
