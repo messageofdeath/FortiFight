@@ -60,12 +60,12 @@ public class Blocks {
 	}
 	
 	public static boolean isWithinAnotherBlock(String name, String loc) {
-		int radius = 5;// Engine.config.getInt("Game.blockProtectionRadius")
+		int radius = Engine.config.getInt("Game.blockProtectionRadius");
 		String[] loc22 = loc.split(",");
 		int startX = Integer.parseInt(loc22[0]), startY = Integer.parseInt(loc22[1]), startZ = Integer.parseInt(loc22[2]) ;
-		for (int x = startX - radius; x < startX + radius; x++) {
-			for (int y = startY - radius; y < startY + radius; y++) {
-				for (int z = startZ - radius; z < startZ + radius; z++) {
+		for (int x = startX - radius; x <= startX + radius; x++) {
+			for (int y = startY - radius; y <= startY + radius; y++) {
+				for (int z = startZ - radius; z <= startZ + radius; z++) {
 					String newLoc = x + "," + y + "," + z;
 					if(Blocks.checkBlock(newLoc)) {
 						if(!Blocks.checkIfHeOwnsIt(name, newLoc)) {

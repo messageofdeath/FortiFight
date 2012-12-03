@@ -4,6 +4,7 @@ import java.util.logging.Level;
 
 import me.messageofdeath.FortiFight.API.Engine;
 import me.messageofdeath.FortiFight.Listeners.playerListener;
+import me.messageofdeath.FortiFight.commands.fortCommand;
 
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginDescriptionFile;
@@ -22,6 +23,7 @@ public class FortiFight extends JavaPlugin {
 		prefix = "[" + file.getName() + "] " +  file.getVersion() + ": ";
 		Engine.onStartUp();
 		getServer().getPluginManager().registerEvents(new playerListener(), this);
+		getCommand("fort").setExecutor(new fortCommand());
 		log(Level.INFO, "is now enabled!");
 	}
 	

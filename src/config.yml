@@ -2,7 +2,7 @@
 Game:
   #This is where they will be teleported when the game starts
   #Like when they go into creative for 10 minutes
-  creativeSpawn:
+  gameSpawn:
     World:
     X:
     Y:

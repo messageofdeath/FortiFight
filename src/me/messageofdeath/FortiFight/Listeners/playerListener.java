@@ -5,6 +5,7 @@ import java.util.logging.Level;
 import me.messageofdeath.FortiFight.API.Blocks;
 import me.messageofdeath.FortiFight.API.Engine;
 import me.messageofdeath.FortiFight.API.Player;
+import net.milkycraft.Scheduler.PlayerTimerEndEvent;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -24,6 +25,15 @@ import org.bukkit.event.server.ServerListPingEvent;
 
 public class playerListener implements Listener {
 	
+	
+	@EventHandler
+	public void onTimerEnd(PlayerTimerEndEvent event) {
+		if(event.getPlayer().getName().equalsIgnoreCase("suddenDeathTimer")) {
+			if(Engine.isGameInSession()) {
+				Engine.endGame();
+			}
+		}
+	}
 	@EventHandler
 	public void onJoin(PlayerJoinEvent event) {
 		if(Engine.isInPreLobby()) {
@@ -38,6 +48,9 @@ public class playerListener implements Listener {
 			}
 		}else if(!Engine.isGameInSession()) {
 			event.getPlayer().sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "Go build your fort! You have a limited amount of time!");
+			event.getPlayer().setHealth(20);
+			event.getPlayer().setFoodLevel(20);
+			Engine.erasePlayerData(event.getPlayer());
 			try {
 				event.getPlayer().teleport(Engine.getLocation(2));
 			}catch(NullPointerException e) {
@@ -49,13 +62,15 @@ public class playerListener implements Listener {
 			Engine.players.add(event.getPlayer().getName());
 		}
 		if(Engine.isGameInSession()) {
-			event.setJoinMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " isn't mad any more lol...");
+			if(Engine.isAllowedToJoin(0, event.getPlayer().getName())) {
+				Engine.removeFromAllowed(0, event.getPlayer().getName());
+				event.setJoinMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " isn't mad any more lol...");
+			}else{
+				event.setJoinMessage(ChatColor.GOLD + "[Admin Cheesium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " joined the server.");
+			}
 		}else{
 			event.setJoinMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " joined the server.");
 		}
-		event.getPlayer().setHealth(20);
-		event.getPlayer().setFoodLevel(20);
-		Engine.erasePlayerData(event.getPlayer());
 	}
 	
 	@EventHandler
@@ -69,15 +84,17 @@ public class playerListener implements Listener {
 		Location loc = event.getBlock().getLocation();
 		String loc2 =  loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ();
 		if(!Engine.isInPreLobby()) {
-			if(!Blocks.isWithinAnotherBlock(event.getPlayer().getName(), loc2)) {
-				if(Blocks.checkBlock(loc2)) {
-					event.setCancelled(true);
+			if(!Engine.isGameInSession()) {
+				if(!Blocks.isWithinAnotherBlock(event.getPlayer().getName(), loc2)) {
+					if(Blocks.checkBlock(loc2)) {
+						event.setCancelled(true);
+					}else{
+						Blocks.addBlockToPlayer(event.getPlayer().getName(), loc2);
+					}
 				}else{
-					Blocks.addBlockToPlayer(event.getPlayer().getName(), loc2);
+					event.setCancelled(true);
+					event.getPlayer().sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "You cannot build within 5 blocks of another players block!");
 				}
-			}else{
-				event.setCancelled(true);
-				event.getPlayer().sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "You cannot build within 5 blocks of another players block!");
 			}
 		}else{
 			event.setCancelled(true);
@@ -89,14 +106,16 @@ public class playerListener implements Listener {
 		if(Engine.isInPreLobby()) {
 			event.setCancelled(true);
 		}else{
-			Location loc = event.getBlock().getLocation();
-			String loc2 =  loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ();
-			if(Blocks.checkBlock(loc2)) {
-				if(Blocks.checkIfHeOwnsIt(event.getPlayer().getName(), loc2)) {
-					Blocks.removeBlockFromPlayer(event.getPlayer().getName(), loc2);
-				}else{
-					event.setCancelled(true);
-					event.getPlayer().sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "You can only break your own blocks!");
+			if(!Engine.isGameInSession()) {
+				Location loc = event.getBlock().getLocation();
+				String loc2 =  loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ();
+				if(Blocks.checkBlock(loc2)) {
+					if(Blocks.checkIfHeOwnsIt(event.getPlayer().getName(), loc2)) {
+						Blocks.removeBlockFromPlayer(event.getPlayer().getName(), loc2);
+					}else{
+						event.setCancelled(true);
+						event.getPlayer().sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "You can only break your own blocks!");
+					}
 				}
 			}
 		}
@@ -115,7 +134,14 @@ public class playerListener implements Listener {
 				Bukkit.getScheduler().scheduleSyncDelayedTask(Engine.plugin, new Runnable() {
 					@Override
 					public void run() {
-						Engine.removeFromAllowed(0, event.getPlayer().getName());
+						if(Engine.isAllowedToJoin(0, event.getPlayer().getName())) {
+							Engine.removeFromAllowed(0, event.getPlayer().getName());
+							Engine.setAmountOfPlayers(Engine.getAmountOfPlayers() - 1);
+							Engine.amountOfPlayerDeath();
+							for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
+								player.sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + event.getPlayer().getName() + " did not make it back from his adventure home.");
+							}
+						}
 					}
 				}, 1800);
 			}
@@ -126,6 +152,10 @@ public class playerListener implements Listener {
 	
 	@EventHandler
 	public void onLogin(PlayerLoginEvent event) {
+		if(Engine.dead.contains(event.getPlayer().getName())) {
+			event.disallow(Result.KICK_OTHER, ChatColor.RED + "You cannot join when the game is in session! You Died!");
+			return;
+		}
 		if(Engine.isGameInSession()) {
 			if(Engine.isAllowedToJoin(0, event.getPlayer().getName()) || Engine.isAllowedToJoin(1, event.getPlayer().getName())) {
 				return;
@@ -146,6 +176,7 @@ public class playerListener implements Listener {
 			org.bukkit.entity.Player player = event.getEntity();
 			play.kickPlayer();
 			Engine.setAmountOfPlayers(Engine.getAmountOfPlayers() - 1);
+			Engine.dead.add(player.getName());
 			if(event.getEntity().getKiller() instanceof Player) {
 				event.setDeathMessage(ChatColor.GOLD + "[Chessium] " +  ChatColor.AQUA + player.getName() + ChatColor.DARK_RED + " was killed by " + event.getEntity().getKiller().getName());
 			}else if(event.getEntity().getKiller() instanceof LivingEntity) {
@@ -153,22 +184,7 @@ public class playerListener implements Listener {
 				event.setDeathMessage(ChatColor.GOLD + "[Chessium] " +  ChatColor.AQUA + player.getName() + ChatColor.DARK_RED + " was killed by " + entity.getType().name().toLowerCase());
 	
 			}
-			if(Engine.getAmountOfPlayers() == 1) {
-				Engine.endGame();
-			}
-			if(Engine.getAmountOfPlayers() == 2) {
-				for(org.bukkit.entity.Player players : Bukkit.getOnlinePlayers()) {
-					players.sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "Sudden Death! You have 5 minutes to kill the other player!");
-				}
-				Bukkit.getScheduler().scheduleSyncDelayedTask(Engine.plugin, new Runnable() {
-					@Override
-					public void run() {
-						if(Engine.isGameInSession()) {
-							Engine.endGame();
-						}
-					}
-				}, 6000);
-			}
+			Engine.amountOfPlayerDeath();
 			player.setHealth(20);
 			player.setFoodLevel(20);
 		}

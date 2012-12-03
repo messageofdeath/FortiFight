@@ -21,6 +21,7 @@ public class Time {
 	 */
 	public final static Time gameTime = new Time(1200.0);
 	public final static Time preGameTime = new Time(600.0);
+	public final static Time suddenDeathTime = new Time(300.0);
 
 	private double time;
 	/**

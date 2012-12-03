@@ -48,6 +48,12 @@ public class PlayerTimer implements Runnable, Timer {
 		}
 		return secs;
 	}
+	
+	public static void clearTimers() {
+		for(Schedule s : PlayerTimer.ptask) {
+			ptask.remove(s);
+		}
+	}
 
 	/**
 	 * Checks if is cooling down.

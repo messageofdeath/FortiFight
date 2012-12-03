@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 
+import net.coreprotect.CoreProtectAPI;
 import net.milkycraft.Scheduler.PlayerTimer;
 import net.milkycraft.Scheduler.Schedule;
 import net.milkycraft.Scheduler.Scheduler;
@@ -30,11 +31,13 @@ public class Engine {
 	
 	public static boolean canJoin = true;
 	public static boolean isInPreLobby = true;
+	public static boolean isInSuddenDeath = false;
 	public static FortiFight plugin = FortiFight.plugin;
-	private static File file;
+	public static File file;
 	public static FileConfiguration config;
 	private static int amountOfPlayers;
-	public static ArrayList<String> players = new ArrayList<String>(), allowed = new ArrayList<String>(), adminallowed = new ArrayList<String>();
+	public static ArrayList<String> players = new ArrayList<String>(), allowed = new ArrayList<String>(), adminallowed = new ArrayList<String>()
+			, dead = new ArrayList<String>();
 	
 	public static void log(Level level, String log) {
 		FortiFight.log(level, log);
@@ -42,6 +45,24 @@ public class Engine {
 	
 	public static int getAmountOfPlayers() {
 		return amountOfPlayers;
+	}
+	
+	public static void amountOfPlayerDeath() {
+		if(Engine.getAmountOfPlayers() <= 1) {
+			Engine.endGame();
+		}
+		if(Engine.getAmountOfPlayers() == 2) {
+			for(org.bukkit.entity.Player players : Bukkit.getOnlinePlayers()) {
+				players.sendMessage(ChatColor.GOLD + "[Cheesium] " + ChatColor.DARK_RED + "Sudden Death! You have 5 minutes to kill the other player!");
+			}
+			isInSuddenDeath = true;
+			PlayerTimer.clearTimers();
+			Scheduler.schedulePlayerCooldown(Scheduler.schedule(plugin, "suddenDeathTimer", Time.suddenDeathTime));
+		}
+	}
+	
+	public static boolean isGameInSuddenDeath() {
+		return isInSuddenDeath;
 	}
 	
 	public static void setAmountOfPlayers(int i) {
@@ -124,10 +145,10 @@ public class Engine {
 					, Float.parseFloat(String.valueOf(config.getDouble("Game.preGameSpawn.Pitch"))));
 		}
 		if(i == 2) {
-			return new Location(Bukkit.getWorld(config.getString("Game.creativeSpawn.World")), config.getDouble("Game.creativeSpawn.X")
-					, config.getDouble("Game.creativeSpawn.Y"), config.getDouble("Game.creativeSpawn.Z")
-					, Float.parseFloat(String.valueOf(config.getDouble("Game.creativeSpawn.Yaw")))
-					, Float.parseFloat(String.valueOf(config.getDouble("Game.creativeSpawn.Pitch"))));
+			return new Location(Bukkit.getWorld(config.getString("Game.gameSpawn.World")), config.getDouble("Game.gameSpawn.X")
+					, config.getDouble("Game.gameSpawn.Y"), config.getDouble("Game.gameSpawn.Z")
+					, Float.parseFloat(String.valueOf(config.getDouble("Game.gameSpawn.Yaw")))
+					, Float.parseFloat(String.valueOf(config.getDouble("Game.gameSpawn.Pitch"))));
 		}
 		return null;
 	}
@@ -135,6 +156,8 @@ public class Engine {
 	public static String getMOTD() {
 		if(Engine.isInPreLobby()) {
 			return ChatColor.DARK_RED + "The game is the in lobby.";
+		}else if(Engine.isGameInSuddenDeath()) {
+			return ChatColor.DARK_RED + "The game is in Sudden Death!                     Time Left: " + Engine.getTimeLeft("suddenDeathTimer", Time.suddenDeathTime);
 		}else if(Engine.isGameInSession()) {
 			return ChatColor.DARK_RED + "The game is in session.                           Time Left: " + Engine.getTimeLeft("gameTimer", Time.gameTime);
 		}else if(!Engine.isInPreLobby()) {
@@ -153,6 +176,7 @@ public class Engine {
 		for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) {
 			player.kickPlayer(ChatColor.DARK_RED + "You have been kicked due to a reload/shutdown");
 		}
+		Engine.endGame();
 	}
 	
 	private static void copy(InputStream in, File file) {
@@ -174,8 +198,7 @@ public class Engine {
 	public static void startGame() {
 		isInPreLobby = false;
 		adminallowed = (ArrayList<String>)config.getList("Game.canJoinWhenGameIsInSession");
-		Schedule s = Scheduler.schedule(plugin, "preGameTimer", Time.preGameTime);
-		Scheduler.schedulePlayerCooldown(s);
+		Scheduler.schedulePlayerCooldown(Scheduler.schedule(plugin, "preGameTimer", Time.preGameTime));
 		for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
 			player.setGameMode(GameMode.CREATIVE);
 			try {
@@ -203,11 +226,14 @@ public class Engine {
 						Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
 							@Override
 							public void run() {
+								int i = 0;
 								for(org.bukkit.entity.Player player : Bukkit.getOnlinePlayers())  {
 									player.setGameMode(GameMode.SURVIVAL);
 									player.sendMessage(ChatColor.GOLD + "[Chessium] " + ChatColor.DARK_RED + "The game has started! You have 20 minutes!");
+									i++;
 								}
-								Engine.setAmountOfPlayers(Bukkit.getOnlinePlayers().length);
+								Engine.setAmountOfPlayers(i);
+								Engine.amountOfPlayerDeath();
 								canJoin = false;
 								Engine.startTimer();
 							}
@@ -221,7 +247,6 @@ public class Engine {
 	public static void startTimer() {
 		Schedule s = Scheduler.schedule(plugin, "gameTimer", Time.gameTime);
 		Scheduler.schedulePlayerCooldown(s);
-		
 		Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
 			@Override
 			public void run() {
@@ -262,6 +287,7 @@ public class Engine {
 		allowed.clear();
 		canJoin = true;
 		isInPreLobby = true;
+		PlayerTimer.clearTimers();
 	}
 	
 	public static void erasePlayerData(org.bukkit.entity.Player player) {
@@ -269,7 +295,7 @@ public class Engine {
 	}
 	
 	public static void removeItemsFromWorld() {
-		World world = Bukkit.getWorld(config.getString("Game.creativeSpawn.World"));
+		World world = Bukkit.getWorld(config.getString("Game.gameSpawn.World"));
 		final List<Entity> entities = world.getEntities();
 		for(Entity entity : entities) {
 			if(entity instanceof Item) {
@@ -282,7 +308,6 @@ public class Engine {
 		for(String name : players) {
 			Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "co rollback u:" + name + " t:24h");
 		}
-		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "co rollback u:creeper t:24h");
 		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "co rollback u:explosion t:24");
 		players.clear();
 	}
